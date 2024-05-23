@@ -1,4 +1,5 @@
 import email.utils
+from optparse import OptionError
 import os
 from sys import argv
 import imaplib
@@ -6,6 +7,24 @@ import email
 import csv
 from itertools import groupby
 import sqlite3
+from xmlrpc.client import Boolean
+import inquirer
+
+DATALOGIN = {
+  'host': 'outlook.office365.com',
+  'mail': os.environ['EMAIL'],
+  'pwd': os.environ['PASSWORD'],
+}
+
+INITIAL_DATAMAIL = {
+  'loged': False,
+  'mailbox': 'inbox',
+  'search': 'ALL',
+  'mail': None,
+  'messages': None
+}
+
+DATAMAIL = INITIAL_DATAMAIL
 
 def chunk_array(array, size):
     chunked = []
@@ -51,17 +70,25 @@ def db_insert_domain(msg_id, domain):
 
 def imap_connect_to_mailbox(mailbox:str = 'inbox', search:str = 'ALL'):
   # Account credentials
-  username = os.environ['EMAIL']
-  password = os.environ['PASSWORD']
+  username = DATALOGIN['mail']
+  password = DATALOGIN['pwd']
 
   # Connect to the Outlook IMAP server
-  mail = imaplib.IMAP4_SSL("outlook.office365.com")
+  mail = imaplib.IMAP4_SSL(DATALOGIN['host'])
   # Log in to your account
   mail.login(username, password)
   # Select the mailbox you want to use (e.g., inbox)
   mail.select(mailbox)
   # Search for all emails in the mailbox
   status, messages = mail.search(None, search)
+  global DATAMAIL
+  DATAMAIL = {
+    'loged': status == 'OK',
+    'mailbox': mailbox,
+    'search': search,
+    'mail': mail,
+    'messages': messages
+  }
   return (mail, status, messages)
 
 def imap_create_mailboxs(folders_to_create: list[str]):
@@ -175,8 +202,9 @@ def sort_emails():
         mail.close()
         mail.logout()
 
-def main():
-  mailbox = 'inbox'
+def showReport():
+  global DATAMAIL
+  mailbox = DATAMAIL['mailbox']
 
   listDomains = list()
 
@@ -207,6 +235,8 @@ def main():
   
   mail.close()
   mail.logout()
+  print('press \'Enter\' to continue')
+  input()
 
 def help():
   print(
@@ -219,6 +249,65 @@ Options:
 --exportDB         export data domains in a sqlite database
 --exportCSV        export data domains in a csv file
 """)
+
+def login():
+  global DATALOGIN
+  formLogin = [
+    inquirer.List('host', 'Email Service', ["outlook.office365.com"]),
+    inquirer.Text('mail', 'Email', DATALOGIN['mail']),
+    inquirer.Password('pwd')
+  ]
+
+  resultFormLogin = inquirer.prompt(formLogin)
+  DATALOGIN = resultFormLogin
+  imap_connect_to_mailbox()
+
+def logout():
+  global DATAMAIL, INITIAL_DATAMAIL
+  DATAMAIL = INITIAL_DATAMAIL
+
+connectedOptionsDict = {
+  "Logout": logout,
+  "Show Report": showReport,
+  "Help": help,
+  "Exit": 'exit'
+}
+
+disconnectedOptionsDict = {
+  "Login": login,
+  "Help": help,
+  "Exit": 'exit'
+}  
+
+def getOptionsDict(connected: Boolean):
+  if connected:
+    return connectedOptionsDict
+  else:
+    return disconnectedOptionsDict
+
+def menu():
+  global DATALOGIN, DATAMAIL
+  print(f'clean-mailbox', end='\n\n')
+  connected = DATAMAIL['loged']
+  if connected:
+    print(f'connected with {DATALOGIN["mail"]} in {DATAMAIL["mailbox"]}', end='\n\n')
+
+  dictOptions = getOptionsDict(connected)
+  options = list(dictOptions.keys())
+  menu = [
+    inquirer.List('option', 'what do you want to do?', options)
+  ]
+
+  return inquirer.prompt(menu)['option'], dictOptions
+
+def main():
+  while True:
+    optionSelected, dictOptions = menu()
+    valueOption = dictOptions[optionSelected]
+    if type(valueOption).__name__ == 'function':
+      valueOption()
+    if valueOption == 'exit':
+      break
 
 if __name__ == "__main__":
   if('--cleanDatabase' in argv):
@@ -236,4 +325,4 @@ if __name__ == "__main__":
   if len(argv) == 1:
     main()
   # export_to_csv()
-  # main()
+  # testInquirer()
