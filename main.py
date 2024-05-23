@@ -214,7 +214,7 @@ def showReport():
   for msg_id in messages[0].split():
     from_email = email.utils.parseaddr(email.message_from_bytes(mail.fetch(msg_id, "(RFC822)")[1][0][1]).get('from'))[1]
     domain = from_email.split('@')[-1]
-    listDomains.append(domain)
+    listDomains.append(domain.lower())
     print(f'reading emails ({msg_id.decode()}/{n_mensajes})', end='\r')
   print('')
 
@@ -223,7 +223,7 @@ def showReport():
                                 "domain":k[0],
                                 "cantidad": len(list(k[1]))
                               }
-                              , groupby(sorted(listDomains, key=lambda x: x[0]), key=lambda x: x)
+                              , groupby(sorted(listDomains, key=lambda x: x), key=lambda x: x.lower())
                             )
                         )
   
@@ -269,6 +269,7 @@ def logout():
 connectedOptionsDict = {
   "Logout": logout,
   "Show Report": showReport,
+  "Export csv": export_to_csv,
   "Help": help,
   "Exit": 'exit'
 }
