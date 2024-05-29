@@ -21,7 +21,8 @@ INITIAL_DATAMAIL = {
   'mailbox': 'inbox',
   'search': 'ALL',
   'mail': None,
-  'messages': None
+  'messages': None,
+  'l_mailbox': []
 }
 
 DATAMAIL = INITIAL_DATAMAIL
@@ -79,6 +80,8 @@ def imap_connect_to_mailbox(mailbox:str = 'inbox', search:str = 'ALL'):
   mail.login(username, password)
   # Select the mailbox you want to use (e.g., inbox)
   mail.select(mailbox)
+  # Get list of mailboxs
+  listOfMailboxs = mail.list()[1]
   # Search for all emails in the mailbox
   status, messages = mail.search(None, search)
   global DATAMAIL
@@ -87,7 +90,8 @@ def imap_connect_to_mailbox(mailbox:str = 'inbox', search:str = 'ALL'):
     'mailbox': mailbox,
     'search': search,
     'mail': mail,
-    'messages': messages
+    'messages': messages,
+    'l_mailbox': listOfMailboxs
   }
   return (mail, status, messages)
 
@@ -116,6 +120,20 @@ def imap_reconect(mailbox:str = 'inbox'):
   mail.login(username, password)
   mail.select(mailbox)
   return mail
+
+def imap_list_mailboxes():
+  global DATAMAIL, DATALOGIN
+  l_mailbox = DATAMAIL['l_mailbox']
+  email = DATALOGIN['mail']
+  print(f'{email} mailbox\'s: ')
+  for mailbox in l_mailbox:
+    mailbox_data = mailbox.decode().split()
+    path = mailbox_data[-2]
+    name = mailbox_data[-1]
+    print(f'{path}{name}')
+  print('')
+  print('Press \'Enter\' to continue..')
+  input()
 
 def export_to_db():
   db_create_database()
@@ -264,11 +282,13 @@ def login():
 
 def logout():
   global DATAMAIL, INITIAL_DATAMAIL
+  print(DATAMAIL['mail'].logout())
   DATAMAIL = INITIAL_DATAMAIL
 
 connectedOptionsDict = {
   "Logout": logout,
   "Show Report": showReport,
+  "Show Mailboxs": imap_list_mailboxes,
   "Export csv": export_to_csv,
   "Help": help,
   "Exit": 'exit'
